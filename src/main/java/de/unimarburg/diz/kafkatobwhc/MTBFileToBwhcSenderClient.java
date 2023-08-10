@@ -36,9 +36,11 @@ import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.listener.RetryListenerSupport;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.*;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Objects;
@@ -59,31 +61,33 @@ public class MTBFileToBwhcSenderClient {
         this.deleteUrl = deleteUrl;
         objectMapper = new ObjectMapper();
     }
-
+    static ResponseEntity<BwhcResponse> responseEntity;
     public BwhcResponseKafka sendRequest(String message) throws JacksonException{
         BwhcResponseKafka bwhcResponseKafka = new BwhcResponseKafka();
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> requestEntity = new HttpEntity<>(message, headers);
-        ResponseEntity<BwhcResponse> responseEntity;
+
         String request_type = decidePostOrDelete(message);
         String patientId = retunPID(message);
         switch (request_type){
             case("post"):
-
-                responseEntity = retryTemplate.execute(ctx -> restTemplate
-                        .exchange(postUrl,HttpMethod.POST, requestEntity, BwhcResponse.class));
+                try {
+                    responseEntity = retryTemplate.execute(ctx -> restTemplate
+                            .exchange(postUrl, HttpMethod.POST, requestEntity, BwhcResponse.class));
                     if (responseEntity.getStatusCode().is2xxSuccessful()) {
                         log.debug("API request succeeded");
                         BwhcResponse bwhcResponseBody = responseEntity.getBody();
                         bwhcResponseKafka.setResposeBody(Arrays.asList(bwhcResponseBody));
                         bwhcResponseKafka.setStatusCode(responseEntity.getStatusCode().value());
-                    } else {
-                        log.warn("API request unsuccessful. Response: {}", responseEntity.getStatusCode().value());
-                        log.debug("Response: {}",responseEntity.getBody());
-                        throw new RuntimeException();
                     }
+                } catch (HttpClientErrorException e){
+                    log.debug("API request succeeded");
+                    bwhcResponseKafka.setStatusCode(e.getStatusCode().value());
+                    bwhcResponseKafka.setResposeBody(Arrays.asList(e.getResponseBodyAs(BwhcResponse.class)));
+                    return bwhcResponseKafka;
+                }
             case("delete"):
                 String deleteUrlPid = deleteUrl+patientId;
                 responseEntity = retryTemplate.execute(ctx -> restTemplate
@@ -98,6 +102,7 @@ public class MTBFileToBwhcSenderClient {
         }
         return bwhcResponseKafka;
     }
+
 
     private static void extracted(ResponseEntity<BwhcResponse> responseEntity) {
         log.warn("API request unsuccessful. Response: {}", responseEntity.getStatusCode().value());
@@ -145,8 +150,7 @@ public class MTBFileToBwhcSenderClient {
         backOffPolicy.setMultiplier(1.25);
         retryTemplate.setBackOffPolicy(backOffPolicy);
         HashMap<Class<? extends Throwable>, Boolean> retryableExceptions = new HashMap<>();
-        retryableExceptions.put(HttpServerErrorException.class,true);
-        retryableExceptions.put(HttpClientErrorException.class,true);
+        retryableExceptions.put(RestClientException.class,true);
         RetryPolicy retryPolicy = new SimpleRetryPolicy(3, retryableExceptions);
         retryTemplate.setRetryPolicy(retryPolicy);
         retryTemplate.registerListener(new RetryListenerSupport() {
