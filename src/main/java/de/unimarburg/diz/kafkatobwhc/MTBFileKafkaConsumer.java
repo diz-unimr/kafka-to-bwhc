@@ -45,7 +45,6 @@ public class MTBFileKafkaConsumer{
     @Value("${spring.kafka.producer.topic}")
     private final String dnpmResponseTopic = "dnpm-response";
 
-
     @Autowired
     public MTBFileKafkaConsumer(MTBFileToBwhcSenderClient mtbFileToBwhcSenderClient,
                                 KafkaTemplate<String, BwhcResponseKafka> kafkaTemplate) {
@@ -57,12 +56,18 @@ public class MTBFileKafkaConsumer{
     @KafkaListener(topics = "${spring.kafka.consumer.topic}")
     public void listen(ConsumerRecord<String, String> record) throws JacksonException {
         String message = record.value();
+        System.out.println(message);
         String key = record.key();
-        System.out.println("Received message: " + message);
-        //Send message
-        BwhcResponseKafka bwhcResponseKafka = mtbFileToBwhcSenderClient.sendRequest(message);
-        kafkaTemplate.sendDefault(key,bwhcResponseKafka);
-        // writing the response in a kafka topic
-        log.debug("Response successfully written in kafka");
+        BwhcResponseKafka eachResponseBeforeKafka = mtbFileToBwhcSenderClient.sendRequestToBwhc(message);
+        if (eachResponseBeforeKafka.getStatusCode() != 900){
+            kafkaTemplate.sendDefault(key,eachResponseBeforeKafka);
+            // writing the response in a kafka topic
+            log.debug("Response successfully written in kafka");
+        }else {
+            // write a response in response-topic and throw a runtime exception
+            kafkaTemplate.sendDefault(key,eachResponseBeforeKafka);
+            log.debug("Response successfully written in kafka");
+            throw new RuntimeException();
         }
+    }
 }

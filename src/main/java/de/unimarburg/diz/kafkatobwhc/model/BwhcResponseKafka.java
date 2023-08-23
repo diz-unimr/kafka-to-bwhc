@@ -24,7 +24,6 @@ package de.unimarburg.diz.kafkatobwhc.model;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
-import java.util.List;
 import lombok.Data;
 
 @Data
@@ -32,10 +31,14 @@ public class BwhcResponseKafka {
 
     @JsonProperty
     @JsonSetter(nulls = Nulls.AS_EMPTY)
+    private String requestId;
+
+    @JsonProperty
+    @JsonSetter(nulls = Nulls.AS_EMPTY)
     private Integer statusCode;
 
     @JsonProperty
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List <BwhcResponse> resposeBody;
+    private Object statusBody;
 
 }

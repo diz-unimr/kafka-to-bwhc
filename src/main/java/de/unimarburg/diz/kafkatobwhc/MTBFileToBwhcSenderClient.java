@@ -22,7 +22,6 @@
 package de.unimarburg.diz.kafkatobwhc;
 
 import com.fasterxml.jackson.core.JacksonException;
-import de.unimarburg.diz.kafkatobwhc.model.BwhcResponse;
 import de.unimarburg.diz.kafkatobwhc.model.BwhcResponseKafka;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,19 +40,17 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestTemplate;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Objects;
-
 
 @Component
 public class MTBFileToBwhcSenderClient {
     private static final Logger log = LoggerFactory.getLogger(MTBFileToBwhcSenderClient.class);
     private final String postUrl;
     private final String deleteUrl;
-    private static RetryTemplate retryTemplate = defaultTemplate();
+    private final RetryTemplate retryTemplate = defaultTemplate();
     private final ObjectMapper objectMapper;
-
+    static ResponseEntity<Object> responseEntity;
     @Autowired
     public MTBFileToBwhcSenderClient(@Value("${services.mtbSender.post_url}") String postUrl,
                                      @Value("${services.mtbSender.delete_url}") String deleteUrl){
@@ -61,52 +58,64 @@ public class MTBFileToBwhcSenderClient {
         this.deleteUrl = deleteUrl;
         objectMapper = new ObjectMapper();
     }
-    static ResponseEntity<BwhcResponse> responseEntity;
-    public BwhcResponseKafka sendRequest(String message) throws JacksonException{
-        BwhcResponseKafka bwhcResponseKafka = new BwhcResponseKafka();
+
+    public BwhcResponseKafka sendRequestToBwhc(String message_body) throws JacksonException{
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        var jsonNode = objectMapper.readTree(message_body);
+        String message = jsonNode.get("mtb_file").toString();
+        String requestId = jsonNode.get("request_id").asText();
         HttpEntity<String> requestEntity = new HttpEntity<>(message, headers);
-
         String request_type = decidePostOrDelete(message);
         String patientId = retunPID(message);
+        BwhcResponseKafka bwhcResponseKafka = new BwhcResponseKafka();
         switch (request_type){
             case("post"):
                 try {
                     responseEntity = retryTemplate.execute(ctx -> restTemplate
-                            .exchange(postUrl, HttpMethod.POST, requestEntity, BwhcResponse.class));
+                            .exchange(postUrl, HttpMethod.POST, requestEntity, Object.class));
                     if (responseEntity.getStatusCode().is2xxSuccessful()) {
                         log.debug("API request succeeded");
-                        BwhcResponse bwhcResponseBody = responseEntity.getBody();
-                        bwhcResponseKafka.setResposeBody(Arrays.asList(bwhcResponseBody));
+                        bwhcResponseKafka.setRequestId(requestId);
                         bwhcResponseKafka.setStatusCode(responseEntity.getStatusCode().value());
+                        bwhcResponseKafka.setStatusBody(responseEntity.getBody());
+                        return bwhcResponseKafka;
                     }
                 } catch (HttpClientErrorException e){
                     log.debug("API request succeeded");
+                    bwhcResponseKafka.setRequestId(requestId);
                     bwhcResponseKafka.setStatusCode(e.getStatusCode().value());
-                    bwhcResponseKafka.setResposeBody(Arrays.asList(e.getResponseBodyAs(BwhcResponse.class)));
+                    bwhcResponseKafka.setStatusBody(e.getResponseBodyAs(Object.class));
                     return bwhcResponseKafka;
+                } catch (RestClientException e){
+                    return createErrorResponseKafka(bwhcResponseKafka, requestId);
                 }
             case("delete"):
-                String deleteUrlPid = deleteUrl+patientId;
-                responseEntity = retryTemplate.execute(ctx -> restTemplate
-                        .exchange(deleteUrlPid,HttpMethod.DELETE,requestEntity,BwhcResponse.class));
-                if (responseEntity.getStatusCode().is2xxSuccessful()) {
-                    log.debug("API request succeeded. Response");
-                    bwhcResponseKafka.setStatusCode(responseEntity.getStatusCode().value());
-                } else {
-                    extracted(responseEntity);
-                    throw new RuntimeException();
+                try {
+                    String deleteUrlPid = deleteUrl + patientId;
+                    responseEntity = retryTemplate.execute(ctx -> restTemplate
+                            .exchange(deleteUrlPid, HttpMethod.DELETE, requestEntity, Object.class));
+                    if (responseEntity.getStatusCode().is2xxSuccessful()) {
+                        log.debug("Deletion in bwhc successful");
+                        bwhcResponseKafka.setRequestId(requestId);
+                        bwhcResponseKafka.setStatusCode(responseEntity.getStatusCode().value());
+                        bwhcResponseKafka.setStatusBody("Patient is successfully deleted from BWHC.");
+                        return bwhcResponseKafka;
+                    }
+                }catch (RestClientException e) {
+                    return createErrorResponseKafka(bwhcResponseKafka, requestId);
                 }
         }
         return bwhcResponseKafka;
     }
 
-
-    private static void extracted(ResponseEntity<BwhcResponse> responseEntity) {
-        log.warn("API request unsuccessful. Response: {}", responseEntity.getStatusCode().value());
-        log.debug("Response: {}", responseEntity.getBody());
+    private BwhcResponseKafka createErrorResponseKafka(BwhcResponseKafka bwhcResponseKafka, String requestId) {
+        log.error("BWHC server is not reachable");
+        bwhcResponseKafka.setRequestId(requestId);
+        bwhcResponseKafka.setStatusCode(900);
+        bwhcResponseKafka.setStatusBody("BWCH server is not available.");
+        return bwhcResponseKafka;
     }
 
     public String decidePostOrDelete (String message) throws JacksonException {
@@ -130,12 +139,12 @@ public class MTBFileToBwhcSenderClient {
         return request_type;
     }
 
+
     public String retunPID (String message) throws JacksonException {
         String patientID = "";
         try {
             var jsonNode = objectMapper.readTree(message);
-            var patientId = jsonNode.get("patient").get("id").asText();
-            patientID = patientId.toString();
+            patientID = jsonNode.get("patient").get("id").asText();
         } catch (JacksonException jsonException){
             log.error("JSON parsing failed.", jsonException);
             throw jsonException;

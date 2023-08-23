@@ -19,8 +19,8 @@ spring:
 
 services:
   mtbSender:
-    post_url: ${URL_BWHC_POST:https://my-bwhc-server/bwhc/etl/api/MTBFile}
-    delete_url: ${URL_BWHC_DELETE:https://my-bwhc-server/bwhc/etl/api/Patient/}
+    post_url: ${URL_BWHC_POST:https://bwhc-test.de/bwhc/etl/api/MTBFile}
+    delete_url: ${URL_BWHC_DELETE:https://bwhc-test.de/bwhc/etl/api/Patient/}
 
 management:
   server:
