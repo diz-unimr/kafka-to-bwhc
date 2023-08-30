@@ -42,6 +42,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.Objects;
+import org.apache.http.client.utils.URIBuilder;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 @Component
 public class MTBFileToBwhcSenderClient {
@@ -59,13 +62,14 @@ public class MTBFileToBwhcSenderClient {
         objectMapper = new ObjectMapper();
     }
 
-    public BwhcResponseKafka sendRequestToBwhc(String message_body) throws JacksonException{
+    public BwhcResponseKafka sendRequestToBwhc(String message_body) throws JacksonException, URISyntaxException {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         var jsonNode = objectMapper.readTree(message_body);
-        String message = jsonNode.get("mtb_file").toString();
-        String requestId = jsonNode.get("request_id").asText();
+        String message = jsonNode.get("content").toString();
+        System.out.println(message);
+        String requestId = jsonNode.get("requestId").asText();
         HttpEntity<String> requestEntity = new HttpEntity<>(message, headers);
         String request_type = decidePostOrDelete(message);
         String patientId = retunPID(message);
@@ -93,7 +97,9 @@ public class MTBFileToBwhcSenderClient {
                 }
             case("delete"):
                 try {
-                    String deleteUrlPid = deleteUrl + patientId;
+                    URIBuilder uriBuilder = new URIBuilder(deleteUrl)
+                                .setParameter("param", patientId);
+                        URI deleteUrlPid= uriBuilder.build();
                     responseEntity = retryTemplate.execute(ctx -> restTemplate
                             .exchange(deleteUrlPid, HttpMethod.DELETE, requestEntity, Object.class));
                     if (responseEntity.getStatusCode().is2xxSuccessful()) {
@@ -144,7 +150,7 @@ public class MTBFileToBwhcSenderClient {
         String patientID = "";
         try {
             var jsonNode = objectMapper.readTree(message);
-            patientID = jsonNode.get("patient").get("id").asText();
+            patientID = jsonNode.get("consent").get("patient").asText();
         } catch (JacksonException jsonException){
             log.error("JSON parsing failed.", jsonException);
             throw jsonException;
