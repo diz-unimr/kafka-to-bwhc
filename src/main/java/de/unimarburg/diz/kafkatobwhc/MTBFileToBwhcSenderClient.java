@@ -40,6 +40,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestTemplate;
+
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Objects;
 import org.apache.http.client.utils.URIBuilder;
@@ -62,7 +65,7 @@ public class MTBFileToBwhcSenderClient {
         objectMapper = new ObjectMapper();
     }
 
-    public BwhcResponseKafka sendRequestToBwhc(String message_body) throws JacksonException, URISyntaxException {
+    public BwhcResponseKafka sendRequestToBwhc(String message_body) throws JacksonException, URISyntaxException, MalformedURLException {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -97,9 +100,13 @@ public class MTBFileToBwhcSenderClient {
                 }
             case("delete"):
                 try {
+                    URL givenUrl = new URL(deleteUrl);
+                    String existingPath = givenUrl.getPath();
+                    String newPath = existingPath + patientId;
                     URIBuilder uriBuilder = new URIBuilder(deleteUrl)
-                                .setParameter("param", patientId);
-                        URI deleteUrlPid= uriBuilder.build();
+                                .setPath(newPath);
+                    URI deleteUrlPid= uriBuilder.build();
+                    log.debug("Delete URL:" + deleteUrlPid.toString());
                     responseEntity = retryTemplate.execute(ctx -> restTemplate
                             .exchange(deleteUrlPid, HttpMethod.DELETE, requestEntity, Object.class));
                     if (responseEntity.getStatusCode().is2xxSuccessful()) {

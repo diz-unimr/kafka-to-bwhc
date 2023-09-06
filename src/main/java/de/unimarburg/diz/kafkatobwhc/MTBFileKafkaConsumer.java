@@ -23,6 +23,10 @@ package de.unimarburg.diz.kafkatobwhc;
 
 import com.fasterxml.jackson.core.JacksonException;
 import de.unimarburg.diz.kafkatobwhc.model.BwhcResponseKafka;
+
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,9 +58,8 @@ public class MTBFileKafkaConsumer{
     }
 
     @KafkaListener(topics = "${spring.kafka.consumer.topic}")
-    public void listen(ConsumerRecord<String, String> record) throws JacksonException {
+    public void listen(ConsumerRecord<String, String> record) throws JacksonException, JacksonException, URISyntaxException, MalformedURLException{
         String message = record.value();
-        System.out.println(message);
         String key = record.key();
         BwhcResponseKafka eachResponseBeforeKafka = mtbFileToBwhcSenderClient.sendRequestToBwhc(message);
         if (eachResponseBeforeKafka.getStatusCode() != 900){
