@@ -1,0 +1,39 @@
+spring:
+  jmx:
+    enabled: true
+  kafka:
+    bootstrapServers: ${BOOTSTRAP_SERVERS:localhost:9092}
+    security.protocol: ${SECURITY_PROTOCOL:PLAINTEXT}
+    ssl:
+      trust-store-location: file://${SSL_TRUST_STORE_LOCATION_INTERNAL:/opt/kafka-streams-template/ssl/truststore.jks}
+      trust-store-password: ${SSL_TRUST_STORE_PASSWORD}
+      key-store-location: file://${SSL_KEY_STORE_LOCATION_INTERNAL:/opt/kafka-streams-template/ssl/keystore.jks}
+      key-store-password: ${SSL_KEY_STORE_PASSWORD}
+    consumer:
+      auto-offset-reset: earliest
+      groupID: 1
+      topic: ${DNPM_TOPIC:dnpm}
+    producer:
+      value-serializer: de.unimarburg.diz.kafkatobwhc.configuration.BwhcResponseKafkaSerialiser
+      topic: ${DNPM_RESPONSE_TOPIC:dnpm-response}
+
+services:
+  mtbSender:
+    post_url: ${URL_BWHC_POST:https://bwhc-test.de/bwhc/etl/api/MTBFile}
+    delete_url: ${URL_BWHC_DELETE:https://bwhc-test.de/bwhc/etl/api/Patient/}
+
+management:
+  server:
+    port: 8080
+  endpoints:
+    web:
+      exposure:
+        include: "health, prometheus, info, metric"
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.kafka.config: info
+    de.unimarburg.diz.kafaktobwhc: debug
