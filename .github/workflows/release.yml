@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   workflow_run:
     workflows: ["build"]
-    branches: "main"
+    branches: "master"
     types: [completed]
   release:
     types: [published]
