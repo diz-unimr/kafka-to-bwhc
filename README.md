@@ -13,3 +13,5 @@ requirement of the DIZ Marburg IT infrastructure.
 - DNPM_RESPONSE_TOPIC: Topic where the HTTP response from bwhc will be produced by producer 
 - URL_BWHC_POST: The REST endpoint of bwhc-node for POST request
 - URL_BWHC_DELETE: The REST endpoint of bwhc-node for 
+
+## TODO
