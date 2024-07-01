@@ -94,7 +94,7 @@ dependencies {
 	}
 	intTestImplementation "org.testcontainers:kafka:$testContainersVersion"
 	intTestImplementation "org.testcontainers:junit-jupiter:$testContainersVersion"
-	intTestImplementation 'org.awaitility:awaitility:4.2.0'
+	intTestImplementation 'org.awaitility:awaitility:4.2.1'
 	intTestImplementation 'org.assertj:assertj-core'
 
 }
