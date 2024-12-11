@@ -63,7 +63,7 @@ dependencies {
 
 	// metrics
 	implementation 'io.micrometer:micrometer-registry-prometheus:1.10.5'
-	implementation 'io.micrometer:micrometer-core:1.10.5'
+	implementation 'io.micrometer:micrometer-core:1.14.2'
 
 	// mapper
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
