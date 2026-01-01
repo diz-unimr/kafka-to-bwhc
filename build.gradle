@@ -55,7 +55,7 @@ dependencies {
 	//}
 	implementation 'org.yaml:snakeyaml:2.0'
 	//implementation 'org.springframework.cloud:spring-cloud-stream-binder-kafka-streams'
-	implementation 'org.apache.commons:commons-text:1.10.0'
+	implementation 'org.apache.commons:commons-text:1.15.0'
 
 	// spring boot
 	implementation "org.springframework.boot:spring-boot-starter-web"
